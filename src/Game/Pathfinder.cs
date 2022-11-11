@@ -161,33 +161,33 @@ namespace ClassicUO.Game
                         switch (obj)
                         {
                             case Mobile mobile:
-                            {
-                                if (!ignoreGameCharacters && !mobile.IsDead && !mobile.IgnoreCharacters)
                                 {
-                                    list.Add
-                                    (
-                                        new PathObject
+                                    if (!ignoreGameCharacters && !mobile.IsDead && !mobile.IgnoreCharacters)
+                                    {
+                                        list.Add
                                         (
+                                            new PathObject
+                                            (
                                             (uint) PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE,
-                                            mobile.Z,
-                                            mobile.Z + Constants.DEFAULT_CHARACTER_HEIGHT,
-                                            Constants.DEFAULT_CHARACTER_HEIGHT,
-                                            mobile
-                                        )
-                                    );
+                                                mobile.Z,
+                                                mobile.Z + Constants.DEFAULT_CHARACTER_HEIGHT,
+                                                Constants.DEFAULT_CHARACTER_HEIGHT,
+                                                mobile
+                                            )
+                                        );
+                                    }
+
+                                    canBeAdd = false;
+
+                                    break;
                                 }
 
-                                canBeAdd = false;
-
-                                break;
-                            }
-
                             case Item item when item.IsMulti || item.ItemData.IsInternal:
-                            {
-                                canBeAdd = false;
+                                {
+                                    canBeAdd = false;
 
-                                break;
-                            }
+                                    break;
+                                }
 
                             case Item item2:
                                 if (stepState == (int) PATH_STEP_STATE.PSS_DEAD_OR_GM && (item2.ItemData.IsDoor || item2.ItemData.Weight <= 0x5A || isGM && !item2.IsLocked))
@@ -539,71 +539,71 @@ namespace ClassicUO.Game
             {
                 case 0:
 
-                {
-                    y--;
+                    {
+                        y--;
 
-                    break;
-                }
+                        break;
+                    }
 
                 case 1:
 
-                {
-                    x++;
-                    y--;
+                    {
+                        x++;
+                        y--;
 
-                    break;
-                }
+                        break;
+                    }
 
                 case 2:
 
-                {
-                    x++;
+                    {
+                        x++;
 
-                    break;
-                }
+                        break;
+                    }
 
                 case 3:
 
-                {
-                    x++;
-                    y++;
+                    {
+                        x++;
+                        y++;
 
-                    break;
-                }
+                        break;
+                    }
 
                 case 4:
 
-                {
-                    y++;
+                    {
+                        y++;
 
-                    break;
-                }
+                        break;
+                    }
 
                 case 5:
 
-                {
-                    x--;
-                    y++;
+                    {
+                        x--;
+                        y++;
 
-                    break;
-                }
+                        break;
+                    }
 
                 case 6:
 
-                {
-                    x--;
+                    {
+                        x--;
 
-                    break;
-                }
+                        break;
+                    }
 
                 case 7:
 
-                {
-                    x--;
-                    y--;
+                    {
+                        x--;
+                        y--;
 
-                    break;
-                }
+                        break;
+                    }
             }
         }
 
@@ -661,7 +661,7 @@ namespace ClassicUO.Game
             return Math.Max(Math.Abs(_endPoint.X - point.X), Math.Abs(_endPoint.Y - point.Y));
         }
 
-        private static bool DoesNotExistOnOpenList(int x, int y, int z)
+        private static bool IsOpened(int x, int y, int z)
         {
             for (int i = 0; i < PATHFINDER_MAX_NODES; i++)
             {
@@ -676,7 +676,7 @@ namespace ClassicUO.Game
             return false;
         }
 
-        private static bool DoesNotExistOnClosedList(int x, int y, int z)
+        private static bool IsClosed(int x, int y, int z)
         {
             for (int i = 0; i < PATHFINDER_MAX_NODES; i++)
             {
@@ -691,139 +691,119 @@ namespace ClassicUO.Game
             return false;
         }
 
-        private static int AddNodeToList
-        (
-            int list,
-            int direction,
-            int x,
-            int y,
-            int z,
-            PathNode parent,
-            int cost
-        )
+        private static int OpenNode(int direction, int x, int y, int z, PathNode parent, int cost)
         {
-            if (list == 0)
+            if (!IsClosed(x, y, z))
             {
-                if (!DoesNotExistOnClosedList(x, y, z))
+                if (!IsOpened(x, y, z))
                 {
-                    if (!DoesNotExistOnOpenList(x, y, z))
+                    for (int i = 0; i < PATHFINDER_MAX_NODES; i++)
                     {
-                        for (int i = 0; i < PATHFINDER_MAX_NODES; i++)
+                        PathNode node = _openList[i];
+
+                        if (!node.Used)
                         {
-                            PathNode node = _openList[i];
+                            node.Used = true;
+                            node.Direction = direction;
+                            node.X = x;
+                            node.Y = y;
+                            node.Z = z;
+                            Point p = new Point(x, y);
+                            node.DistFromGoalCost = GetGoalDistCost(p, cost);
+                            node.DistFromStartCost = parent.DistFromStartCost + cost;
+                            node.Cost = node.DistFromGoalCost + node.DistFromStartCost;
+                            node.Parent = parent;
 
-                            if (!node.Used)
+                            if (MathHelper.GetDistance(_endPoint, p) <= _pathfindDistance)
                             {
-                                node.Used = true;
-                                node.Direction = direction;
-                                node.X = x;
-                                node.Y = y;
-                                node.Z = z;
-                                Point p = new Point(x, y);
-                                node.DistFromGoalCost = GetGoalDistCost(p, cost);
-                                node.DistFromStartCost = parent.DistFromStartCost + cost;
-                                node.Cost = node.DistFromGoalCost + node.DistFromStartCost;
-                                node.Parent = parent;
-
-                                if (MathHelper.GetDistance(_endPoint, p) <= _pathfindDistance)
-                                {
-                                    _goalFound = true;
-                                    _goalNode = i;
-                                }
-
-                                _activeOpenNodes++;
-
-                                return i;
+                                _goalFound = true;
+                                _goalNode = i;
                             }
-                        }
-                    }
-                    else
-                    {
-                        for (int i = 0; i < PATHFINDER_MAX_NODES; i++)
-                        {
-                            PathNode node = _openList[i];
 
-                            if (node.Used)
-                            {
-                                if (node.X == x && node.Y == y && node.Z == z)
-                                {
-                                    int startCost = parent.DistFromStartCost + cost;
+                            _activeOpenNodes++;
 
-                                    if (node.DistFromStartCost > startCost)
-                                    {
-                                        node.Parent = parent;
-                                        node.DistFromStartCost = startCost + cost;
-                                        node.Cost = node.DistFromGoalCost + node.DistFromStartCost;
-                                    }
-
-                                    return i;
-                                }
-                            }
+                            return i;
                         }
                     }
                 }
                 else
                 {
-                    return 0;
-                }
-            }
-            else
-            {
-                parent.Used = false;
-
-                for (int i = 0; i < PATHFINDER_MAX_NODES; i++)
-                {
-                    PathNode node = _closedList[i];
-
-                    if (!node.Used)
+                    for (int i = 0; i < PATHFINDER_MAX_NODES; i++)
                     {
-                        node.Used = true;
-                        node.DistFromGoalCost = parent.DistFromGoalCost;
-                        node.DistFromStartCost = parent.DistFromStartCost;
-                        node.Cost = node.DistFromGoalCost + node.DistFromStartCost;
-                        node.Direction = parent.Direction;
-                        node.X = parent.X;
-                        node.Y = parent.Y;
-                        node.Z = parent.Z;
-                        node.Parent = parent.Parent;
-                        _activeOpenNodes--;
-                        _activeCloseNodes++;
+                        PathNode node = _openList[i];
 
-                        return i;
+                        if (node.Used)
+                        {
+                            if (node.X == x && node.Y == y && node.Z == z)
+                            {
+                                int startCost = parent.DistFromStartCost + cost;
+
+                                if (node.DistFromStartCost > startCost)
+                                {
+                                    node.Parent = parent;
+                                    node.DistFromStartCost = startCost + cost;
+                                    node.Cost = node.DistFromGoalCost + node.DistFromStartCost;
+                                }
+
+                                return i;
+                            }
+                        }
                     }
                 }
             }
 
             return -1;
         }
-
-        private static bool OpenNodes(PathNode node)
+        private static int CloseNode(PathNode openNode)
         {
-            bool found = false;
+            openNode.Used = false;
 
+            for (int i = 0; i < PATHFINDER_MAX_NODES; i++)
+            {
+                PathNode node = _closedList[i];
+
+                if (!node.Used)
+                {
+                    node.Used = true;
+                    node.DistFromGoalCost = openNode.DistFromGoalCost;
+                    node.DistFromStartCost = openNode.DistFromStartCost;
+                    node.Cost = node.DistFromGoalCost + node.DistFromStartCost;
+                    node.Direction = openNode.Direction;
+                    node.X = openNode.X;
+                    node.Y = openNode.Y;
+                    node.Z = openNode.Z;
+                    node.Parent = openNode.Parent;
+                    _activeOpenNodes--;
+                    _activeCloseNodes++;
+
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+
+        private static void OpenNodes(PathNode node)
+        {
             for (int i = 0; i < 8; i++)
             {
-                Direction direction = (Direction) i;
+                Direction direction = (Direction)i;
                 int x = node.X;
                 int y = node.Y;
-                sbyte z = (sbyte) node.Z;
+                sbyte z = (sbyte)node.Z;
                 Direction oldDirection = direction;
 
-                if (CanWalk(ref direction, ref x, ref y, ref z))
+                if (CanWalk(ref direction, ref x, ref y, ref z) && direction == oldDirection)
                 {
-                    if (direction != oldDirection)
-                    {
-                        continue;
-                    }
 
                     int diagonal = i % 2;
-
                     if (diagonal != 0)
                     {
-                        Direction wantDirection = (Direction) i;
+                        Direction wantDirection = (Direction)i;
                         int wantX = node.X;
                         int wantY = node.Y;
-                        GetNewXY((byte) wantDirection, ref wantX, ref wantY);
+                        GetNewXY((byte)wantDirection, ref wantX, ref wantY);
 
                         if (x != wantX || y != wantY)
                         {
@@ -831,23 +811,17 @@ namespace ClassicUO.Game
                         }
                     }
 
-                    if (diagonal >= 0 && AddNodeToList
-                    (
-                        0,
-                        (int) direction,
+
+                    if (diagonal >= 0)
+                        OpenNode(
+                        (int)direction,
                         x,
                         y,
                         z,
                         node,
-                        diagonal == 0 ? 1 : 2
-                    ) != -1)
-                    {
-                        found = true;
-                    }
+                        diagonal == 0 ? 1 : 2);
                 }
             }
-
-            return found;
         }
 
         private static int FindCheapestNode()
@@ -871,18 +845,7 @@ namespace ClassicUO.Game
             int result = -1;
 
             if (cheapestNode != -1)
-            {
-                result = AddNodeToList
-                (
-                    1,
-                    0,
-                    0,
-                    0,
-                    0,
-                    _openList[cheapestNode],
-                    2
-                );
-            }
+                return CloseNode(_openList[cheapestNode]);
 
             return result;
         }

@@ -32,10 +32,9 @@
 
 using System;
 using System.Collections.Concurrent;
-using System.Linq;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading.Tasks;
 using ClassicUO.Network.Encryption;
 using ClassicUO.Utility;
@@ -299,7 +298,7 @@ namespace ClassicUO.Network
             }
         }
 
-
+        private DateTime _lastUpdate = DateTime.UtcNow;
         public void Update()
         {
             ProcessRecv();
@@ -319,7 +318,15 @@ namespace ClassicUO.Network
                     offset = 3;
                 }
 
-                PacketHandlers.Handlers.AnalyzePacket(data, offset, data.Length);
+                var sw = Stopwatch.StartNew();
+
+                var handlerName = PacketHandlers.Handlers.AnalyzePacket(data, offset, data.Length);
+
+                // ReSharper disable once LocalizableElement
+                Console.WriteLine($"Processed packet handler {handlerName} take {sw.Elapsed}. " +
+                                  $"{_pluginRecvQueue.Count} handlers queued. " +
+                                  $"Update delta {DateTime.Now - _lastUpdate}");
+                _lastUpdate = DateTime.Now;
             }
 
             ProcessSend();
