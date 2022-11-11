@@ -32,6 +32,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Linq;
+using System.Xml.Linq;
 using ClassicUO.Configuration;
 using ClassicUO.Game.Data;
 using ClassicUO.Game.GameObjects;
@@ -45,11 +48,13 @@ namespace ClassicUO.Game
     internal static class Pathfinder
     {
         private const int PATHFINDER_MAX_NODES = 10000;
-        private static int _goalNode;
-        private static bool _goalFound;
-        private static int _activeOpenNodes, _activeCloseNodes, _pathfindDistance;
-        private static readonly PathNode[] _openList = new PathNode[PATHFINDER_MAX_NODES];
-        private static readonly PathNode[] _closedList = new PathNode[PATHFINDER_MAX_NODES];
+        private const int NodeMapSize = 1000;
+        private static PathNode _goalNode;
+        private static int _pathfindDistance;
+        //private static readonly PathNode[] _openList = new PathNode[PATHFINDER_MAX_NODES];
+        //private static readonly PathNode[] _closedList = new PathNode[PATHFINDER_MAX_NODES];
+        private static Dictionary<Position, PathNode> _nodeMap;
+
         private static readonly PathNode[] _path = new PathNode[PATHFINDER_MAX_NODES];
         private static int _pointIndex, _pathSize;
         private static bool _run;
@@ -661,128 +666,53 @@ namespace ClassicUO.Game
             return Math.Max(Math.Abs(_endPoint.X - point.X), Math.Abs(_endPoint.Y - point.Y));
         }
 
-        private static bool IsOpened(int x, int y, int z)
+        private static PathNode OpenNode(int direction, Position openPosition, PathNode parent, int cost)
         {
-            for (int i = 0; i < PATHFINDER_MAX_NODES; i++)
-            {
-                PathNode node = _openList[i];
+            PathNode node = GetPathNode(openPosition);
 
-                if (node.Used && node.X == x && node.Y == y && node.Z == z)
+            if (node == null)
+            {
+                Point position = new Point(openPosition.X, openPosition.Y);
+                var goalCost = GetGoalDistCost(position, cost);
+                var startCost = parent.DistFromStartCost + cost;
+                node = AddNode(new PathNode(openPosition)
                 {
-                    return true;
-                }
+                    Parent = parent,
+                    Direction = direction,
+                    DistFromGoalCost = goalCost,
+                    DistFromStartCost = startCost,
+                    Cost = goalCost + startCost,
+                });
+
+                if (MathHelper.GetDistance(_endPoint, position) <= _pathfindDistance)
+                    _goalNode = node;
             }
-
-            return false;
-        }
-
-        private static bool IsClosed(int x, int y, int z)
-        {
-            for (int i = 0; i < PATHFINDER_MAX_NODES; i++)
+            else if (!node.Visited)
             {
-                PathNode node = _closedList[i];
+                int startCost = parent.DistFromStartCost + cost;
 
-                if (node.Used && node.X == x && node.Y == y && node.Z == z)
+                if (node.DistFromStartCost > startCost)
                 {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static int OpenNode(int direction, int x, int y, int z, PathNode parent, int cost)
-        {
-            if (!IsClosed(x, y, z))
-            {
-                if (!IsOpened(x, y, z))
-                {
-                    for (int i = 0; i < PATHFINDER_MAX_NODES; i++)
-                    {
-                        PathNode node = _openList[i];
-
-                        if (!node.Used)
-                        {
-                            node.Used = true;
-                            node.Direction = direction;
-                            node.X = x;
-                            node.Y = y;
-                            node.Z = z;
-                            Point p = new Point(x, y);
-                            node.DistFromGoalCost = GetGoalDistCost(p, cost);
-                            node.DistFromStartCost = parent.DistFromStartCost + cost;
-                            node.Cost = node.DistFromGoalCost + node.DistFromStartCost;
-                            node.Parent = parent;
-
-                            if (MathHelper.GetDistance(_endPoint, p) <= _pathfindDistance)
-                            {
-                                _goalFound = true;
-                                _goalNode = i;
-                            }
-
-                            _activeOpenNodes++;
-
-                            return i;
-                        }
-                    }
-                }
-                else
-                {
-                    for (int i = 0; i < PATHFINDER_MAX_NODES; i++)
-                    {
-                        PathNode node = _openList[i];
-
-                        if (node.Used)
-                        {
-                            if (node.X == x && node.Y == y && node.Z == z)
-                            {
-                                int startCost = parent.DistFromStartCost + cost;
-
-                                if (node.DistFromStartCost > startCost)
-                                {
-                                    node.Parent = parent;
-                                    node.DistFromStartCost = startCost + cost;
-                                    node.Cost = node.DistFromGoalCost + node.DistFromStartCost;
-                                }
-
-                                return i;
-                            }
-                        }
-                    }
-                }
-            }
-
-            return -1;
-        }
-        private static int CloseNode(PathNode openNode)
-        {
-            openNode.Used = false;
-
-            for (int i = 0; i < PATHFINDER_MAX_NODES; i++)
-            {
-                PathNode node = _closedList[i];
-
-                if (!node.Used)
-                {
-                    node.Used = true;
-                    node.DistFromGoalCost = openNode.DistFromGoalCost;
-                    node.DistFromStartCost = openNode.DistFromStartCost;
+                    node.Parent = parent;
+                    node.Direction = direction;
+                    node.DistFromStartCost = startCost + cost;
                     node.Cost = node.DistFromGoalCost + node.DistFromStartCost;
-                    node.Direction = openNode.Direction;
-                    node.X = openNode.X;
-                    node.Y = openNode.Y;
-                    node.Z = openNode.Z;
-                    node.Parent = openNode.Parent;
-                    _activeOpenNodes--;
-                    _activeCloseNodes++;
-
-                    return i;
                 }
             }
 
-            return -1;
+
+            return node;
         }
 
+        private static PathNode AddNode(PathNode pathNode)
+        {
+            _nodeMap.Add(pathNode.Position, pathNode);
+
+            return pathNode;
+        }
+
+        private static PathNode GetPathNode(Position openPosition) 
+            => _nodeMap.TryGetValue(openPosition, out var node) ? node : null;
 
         private static void OpenNodes(PathNode node)
         {
@@ -815,52 +745,36 @@ namespace ClassicUO.Game
                     if (diagonal >= 0)
                         OpenNode(
                         (int)direction,
+                        new Position(
                         x,
                         y,
-                        z,
+                        z),
                         node,
                         diagonal == 0 ? 1 : 2);
                 }
             }
         }
 
-        private static int FindCheapestNode()
+        private static PathNode FindCheapestNode()
         {
-            int cheapestCost = 9999999;
-            int cheapestNode = -1;
+            PathNode cheapestNode = _nodeMap.Values.Where(x => !x.Visited).Min();
 
-            for (int i = 0; i < PATHFINDER_MAX_NODES; i++)
-            {
-                if (_openList[i].Used)
-                {
-                    if (_openList[i].Cost < cheapestCost)
-                    {
-                        cheapestNode = i;
+            if (cheapestNode != null)
+                cheapestNode.Visited = true;
 
-                        cheapestCost = _openList[i].Cost;
-                    }
-                }
-            }
-
-            int result = -1;
-
-            if (cheapestNode != -1)
-                return CloseNode(_openList[cheapestNode]);
-
-            return result;
+            return cheapestNode;
         }
 
         private static bool FindPath(int maxNodes)
         {
-            int curNode = 0;
-
-            _closedList[0].Used = true;
-            _closedList[0].X = _startPoint.X;
-            _closedList[0].Y = _startPoint.Y;
-            _closedList[0].Z = World.Player.Z;
-            _closedList[0].Parent = null;
-            _closedList[0].DistFromGoalCost = GetGoalDistCost(_startPoint, 0);
-            _closedList[0].Cost = _closedList[0].DistFromGoalCost;
+            var goalCost = GetGoalDistCost(_startPoint, 0);
+            var currentNode = new PathNode(_startPoint.X, _startPoint.Y, World.Player.Z)
+            {
+                Visited = true,
+                Parent = null,
+                DistFromGoalCost = goalCost,
+                Cost = goalCost,
+            };
 
             if (GetGoalDistCost(_startPoint, 0) > 14)
             {
@@ -869,12 +783,12 @@ namespace ClassicUO.Game
 
             while (AutoWalking)
             {
-                OpenNodes(_closedList[curNode]);
+                OpenNodes(currentNode);
 
-                if (_goalFound)
+                if (_goalNode!=null)
                 {
                     int totalNodes = 0;
-                    PathNode goalNode = _openList[_goalNode];
+                    PathNode goalNode = _goalNode;
 
                     while (goalNode.Parent != null && goalNode != goalNode.Parent)
                     {
@@ -884,7 +798,7 @@ namespace ClassicUO.Game
 
                     totalNodes++;
                     _pathSize = totalNodes;
-                    goalNode = _openList[_goalNode];
+                    goalNode = _goalNode;
 
                     while (totalNodes != 0)
                     {
@@ -896,14 +810,9 @@ namespace ClassicUO.Game
                     break;
                 }
 
-                curNode = FindCheapestNode();
+                currentNode = FindCheapestNode();
 
-                if (curNode == -1)
-                {
-                    return false;
-                }
-
-                if (_activeCloseNodes >= maxNodes)
+                if (currentNode == null || _nodeMap.Count >= maxNodes)
                 {
                     return false;
                 }
@@ -919,22 +828,7 @@ namespace ClassicUO.Game
                 return false;
             }
 
-            for (int i = 0; i < PATHFINDER_MAX_NODES; i++)
-            {
-                if (_openList[i] == null)
-                {
-                    _openList[i] = new PathNode();
-                }
-
-                _openList[i].Reset();
-
-                if (_closedList[i] == null)
-                {
-                    _closedList[i] = new PathNode();
-                }
-
-                _closedList[i].Reset();
-            }
+            _nodeMap = new Dictionary<Position, PathNode>(PATHFINDER_MAX_NODES);
 
 
             int playerX = World.Player.X;
@@ -947,10 +841,7 @@ namespace ClassicUO.Game
             _startPoint.Y = playerY;
             _endPoint.X = x;
             _endPoint.Y = y;
-            _goalNode = 0;
-            _goalFound = false;
-            _activeOpenNodes = 0;
-            _activeCloseNodes = 0;
+            _goalNode = null;
             _pathfindDistance = distance;
             _pathSize = 0;
             PathindingCanBeCancelled = true;
@@ -967,6 +858,7 @@ namespace ClassicUO.Game
                 AutoWalking = false;
             }
 
+            _nodeMap = null;
             return _pathSize != 0;
         }
 
@@ -1055,17 +947,69 @@ namespace ClassicUO.Game
             }
         }
 
-        private class PathNode
+        private readonly struct Position
         {
-            public int X { get; set; }
+            public Position(int x, int y, int z)
+            {
+                X = x;
+                Y = y;
+                Z = z;
+            }
 
-            public int Y { get; set; }
+            public int X { get; }
 
-            public int Z { get; set; }
+            public int Y { get; }
+
+            public int Z { get; }
+
+            public override bool Equals(object obj)
+                => Equals(obj as PathNode);
+
+            private bool Equals(PathNode obj) => obj != null && X == obj.X && Y == obj.Y && Z == obj.Z;
+
+            //public override int GetHashCode()
+            //{
+            //    unchecked
+            //    {
+            //        int hashCode = X;
+            //        hashCode = (hashCode * 397) ^ Y;
+            //        hashCode = (hashCode * 397) ^ Z;
+
+            //        return hashCode;
+            //    }
+            //}
+            // or a faster one
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return X + Y + Z;
+                }
+            }
+
+        }
+        private class PathNode : IComparable<PathNode>
+        {
+            public PathNode(int x, int y, int z) 
+                : this(new Position(x, y, z))
+            {
+            }
+
+            public PathNode(Position position)
+            {
+                Position = position;
+            }
+
+            public Position Position { get; }
+            public int X => Position.X;
+
+            public int Y => Position.Y;
+
+            public int Z => Position.Z;
 
             public int Direction { get; set; }
 
-            public bool Used { get; set; }
+            public bool Visited { get; set; }
 
             public int Cost { get; set; }
 
@@ -1075,12 +1019,9 @@ namespace ClassicUO.Game
 
             public PathNode Parent { get; set; }
 
-            public void Reset()
-            {
-                Parent = null;
-                Used = false;
-                X = Y = Z = Direction = Cost = DistFromGoalCost = DistFromStartCost = 0;
-            }
+
+            public int CompareTo(PathNode other) 
+                => Cost.CompareTo(other.Cost);
         }
     }
 }
