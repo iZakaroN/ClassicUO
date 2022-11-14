@@ -897,7 +897,6 @@ namespace ClassicUO.Game
 
                 totalNodes++;
                 goalNode = _goalNode;
-                Console.Write($"[{_openedNodes}/{_closedNodes}]");
                 lock (_autoWalkLock)
                 {
                     _pathSize = totalNodes;
