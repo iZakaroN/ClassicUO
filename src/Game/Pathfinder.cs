@@ -32,9 +32,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.Linq;
-using System.Xml.Linq;
 using ClassicUO.Configuration;
 using ClassicUO.Game.Data;
 using ClassicUO.Game.GameObjects;
@@ -48,12 +45,12 @@ namespace ClassicUO.Game
     internal static class Pathfinder
     {
         private const int PATHFINDER_MAX_NODES = 10000;
-        private const int NodeMapSize = 1000;
+        private const int NODE_MAP_SIZE = 500;
         private static PathNode _goalNode;
         private static int _pathfindDistance;
-        //private static readonly PathNode[] _openList = new PathNode[PATHFINDER_MAX_NODES];
+        private static LinkedList<PathNode> _openNodes;
         //private static readonly PathNode[] _closedList = new PathNode[PATHFINDER_MAX_NODES];
-        private static Dictionary<Position, PathNode> _nodeMap;
+        private static readonly PathNode[,] _nodeMap = new PathNode[NODE_MAP_SIZE, NODE_MAP_SIZE];
 
         private static readonly PathNode[] _path = new PathNode[PATHFINDER_MAX_NODES];
         private static int _pointIndex, _pathSize;
@@ -90,7 +87,7 @@ namespace ClassicUO.Game
                 return false;
             }
 
-            bool ignoreGameCharacters = ProfileManager.CurrentProfile.IgnoreStaminaCheck || stepState == (int) PATH_STEP_STATE.PSS_DEAD_OR_GM || World.Player.IgnoreCharacters || !(World.Player.Stamina < World.Player.StaminaMax && World.Map.Index == 0);
+            bool ignoreGameCharacters = ProfileManager.CurrentProfile.IgnoreStaminaCheck || stepState == (int)PATH_STEP_STATE.PSS_DEAD_OR_GM || World.Player.IgnoreCharacters || !(World.Player.Stamina < World.Player.StaminaMax && World.Map.Index == 0);
 
             bool isGM = World.Player.Graphic == 0x03DB;
 
@@ -116,25 +113,25 @@ namespace ClassicUO.Game
 
                         if (graphicHelper < 0x01AE && graphicHelper != 2 || graphicHelper > 0x01B5 && graphicHelper != 0x01DB)
                         {
-                            uint flags = (uint) PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE;
+                            uint flags = (uint)PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE;
 
-                            if (stepState == (int) PATH_STEP_STATE.PSS_ON_SEA_HORSE)
+                            if (stepState == (int)PATH_STEP_STATE.PSS_ON_SEA_HORSE)
                             {
                                 if (tile1.TileData.IsWet)
                                 {
-                                    flags = (uint) (PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE | PATH_OBJECT_FLAGS.POF_SURFACE | PATH_OBJECT_FLAGS.POF_BRIDGE);
+                                    flags = (uint)(PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE | PATH_OBJECT_FLAGS.POF_SURFACE | PATH_OBJECT_FLAGS.POF_BRIDGE);
                                 }
                             }
                             else
                             {
                                 if (!tile1.TileData.IsImpassable)
                                 {
-                                    flags = (uint) (PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE | PATH_OBJECT_FLAGS.POF_SURFACE | PATH_OBJECT_FLAGS.POF_BRIDGE);
+                                    flags = (uint)(PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE | PATH_OBJECT_FLAGS.POF_SURFACE | PATH_OBJECT_FLAGS.POF_BRIDGE);
                                 }
 
-                                if (stepState == (int) PATH_STEP_STATE.PSS_FLYING && tile1.TileData.IsNoDiagonal)
+                                if (stepState == (int)PATH_STEP_STATE.PSS_FLYING && tile1.TileData.IsNoDiagonal)
                                 {
-                                    flags |= (uint) PATH_OBJECT_FLAGS.POF_NO_DIAGONAL;
+                                    flags |= (uint)PATH_OBJECT_FLAGS.POF_NO_DIAGONAL;
                                 }
                             }
 
@@ -173,7 +170,7 @@ namespace ClassicUO.Game
                                         (
                                             new PathObject
                                             (
-                                            (uint) PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE,
+                                            (uint)PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE,
                                                 mobile.Z,
                                                 mobile.Z + Constants.DEFAULT_CHARACTER_HEIGHT,
                                                 Constants.DEFAULT_CHARACTER_HEIGHT,
@@ -195,7 +192,7 @@ namespace ClassicUO.Game
                                 }
 
                             case Item item2:
-                                if (stepState == (int) PATH_STEP_STATE.PSS_DEAD_OR_GM && (item2.ItemData.IsDoor || item2.ItemData.Weight <= 0x5A || isGM && !item2.IsLocked))
+                                if (stepState == (int)PATH_STEP_STATE.PSS_DEAD_OR_GM && (item2.ItemData.IsDoor || item2.ItemData.Weight <= 0x5A || isGM && !item2.IsLocked))
                                 {
                                     dropFlags = true;
                                 }
@@ -233,34 +230,34 @@ namespace ClassicUO.Game
                             {
                                 ref StaticTiles itemdata = ref TileDataLoader.Instance.StaticData[obj.Graphic];
 
-                                if (stepState == (int) PATH_STEP_STATE.PSS_ON_SEA_HORSE)
+                                if (stepState == (int)PATH_STEP_STATE.PSS_ON_SEA_HORSE)
                                 {
                                     if (itemdata.IsWet)
                                     {
-                                        flags = (uint) (PATH_OBJECT_FLAGS.POF_SURFACE | PATH_OBJECT_FLAGS.POF_BRIDGE);
+                                        flags = (uint)(PATH_OBJECT_FLAGS.POF_SURFACE | PATH_OBJECT_FLAGS.POF_BRIDGE);
                                     }
                                 }
                                 else
                                 {
                                     if (itemdata.IsImpassable || itemdata.IsSurface)
                                     {
-                                        flags = (uint) PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE;
+                                        flags = (uint)PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE;
                                     }
 
                                     if (!itemdata.IsImpassable)
                                     {
                                         if (itemdata.IsSurface)
                                         {
-                                            flags |= (uint) PATH_OBJECT_FLAGS.POF_SURFACE;
+                                            flags |= (uint)PATH_OBJECT_FLAGS.POF_SURFACE;
                                         }
 
                                         if (itemdata.IsBridge)
                                         {
-                                            flags |= (uint) PATH_OBJECT_FLAGS.POF_BRIDGE;
+                                            flags |= (uint)PATH_OBJECT_FLAGS.POF_BRIDGE;
                                         }
                                     }
 
-                                    if (stepState == (int) PATH_STEP_STATE.PSS_DEAD_OR_GM)
+                                    if (stepState == (int)PATH_STEP_STATE.PSS_DEAD_OR_GM)
                                     {
                                         if (graphicHelper <= 0x0846)
                                         {
@@ -280,9 +277,9 @@ namespace ClassicUO.Game
                                         flags &= 0xFFFFFFFE;
                                     }
 
-                                    if (stepState == (int) PATH_STEP_STATE.PSS_FLYING && itemdata.IsNoDiagonal)
+                                    if (stepState == (int)PATH_STEP_STATE.PSS_FLYING && itemdata.IsNoDiagonal)
                                     {
-                                        flags |= (uint) PATH_OBJECT_FLAGS.POF_NO_DIAGONAL;
+                                        flags |= (uint)PATH_OBJECT_FLAGS.POF_NO_DIAGONAL;
                                     }
                                 }
 
@@ -366,12 +363,12 @@ namespace ClassicUO.Game
                 }
                 else
                 {
-                    if ((obj.Flags & (uint) PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE) != 0 && averageZ <= currentZ && minZ < averageZ)
+                    if ((obj.Flags & (uint)PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE) != 0 && averageZ <= currentZ && minZ < averageZ)
                     {
                         minZ = averageZ;
                     }
 
-                    if ((obj.Flags & (uint) PATH_OBJECT_FLAGS.POF_BRIDGE) != 0 && currentZ == averageZ)
+                    if ((obj.Flags & (uint)PATH_OBJECT_FLAGS.POF_BRIDGE) != 0 && currentZ == averageZ)
                     {
                         int z = obj.Z;
                         int height = z + obj.Height;
@@ -396,17 +393,17 @@ namespace ClassicUO.Game
 
         public static bool CalculateNewZ(int x, int y, ref sbyte z, int direction)
         {
-            int stepState = (int) PATH_STEP_STATE.PSS_NORMAL;
+            int stepState = (int)PATH_STEP_STATE.PSS_NORMAL;
 
             if (World.Player.IsDead || World.Player.Graphic == 0x03DB)
             {
-                stepState = (int) PATH_STEP_STATE.PSS_DEAD_OR_GM;
+                stepState = (int)PATH_STEP_STATE.PSS_DEAD_OR_GM;
             }
             else
             {
                 if (World.Player.IsGargoyle && World.Player.IsFlying)
                 {
-                    stepState = (int) PATH_STEP_STATE.PSS_FLYING;
+                    stepState = (int)PATH_STEP_STATE.PSS_FLYING;
                 }
                 else
                 {
@@ -414,7 +411,7 @@ namespace ClassicUO.Game
 
                     if (mount != null && mount.Graphic == 0x3EB3) // sea horse
                     {
-                        stepState = (int) PATH_STEP_STATE.PSS_ON_SEA_HORSE;
+                        stepState = (int)PATH_STEP_STATE.PSS_ON_SEA_HORSE;
                     }
                 }
             }
@@ -456,7 +453,7 @@ namespace ClassicUO.Game
             (
                 new PathObject
                 (
-                    (uint) PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE,
+                    (uint)PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE,
                     128,
                     128,
                     128,
@@ -468,7 +465,7 @@ namespace ClassicUO.Game
 
             if (z < minZ)
             {
-                z = (sbyte) minZ;
+                z = (sbyte)minZ;
             }
 
             int currentTempObjZ = 1000000;
@@ -478,7 +475,7 @@ namespace ClassicUO.Game
             {
                 PathObject obj = list[i];
 
-                if ((obj.Flags & (uint) PATH_OBJECT_FLAGS.POF_NO_DIAGONAL) != 0 && stepState == (int) PATH_STEP_STATE.PSS_FLYING)
+                if ((obj.Flags & (uint)PATH_OBJECT_FLAGS.POF_NO_DIAGONAL) != 0 && stepState == (int)PATH_STEP_STATE.PSS_FLYING)
                 {
                     int objAverageZ = obj.AverageZ;
                     int delta = Math.Abs(objAverageZ - z);
@@ -491,7 +488,7 @@ namespace ClassicUO.Game
                     }
                 }
 
-                if ((obj.Flags & (uint) PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE) != 0)
+                if ((obj.Flags & (uint)PATH_OBJECT_FLAGS.POF_IMPASSABLE_OR_SURFACE) != 0)
                 {
                     int objZ = obj.Z;
 
@@ -501,11 +498,11 @@ namespace ClassicUO.Game
                         {
                             PathObject tempObj = list[j];
 
-                            if ((tempObj.Flags & (uint) (PATH_OBJECT_FLAGS.POF_SURFACE | PATH_OBJECT_FLAGS.POF_BRIDGE)) != 0)
+                            if ((tempObj.Flags & (uint)(PATH_OBJECT_FLAGS.POF_SURFACE | PATH_OBJECT_FLAGS.POF_BRIDGE)) != 0)
                             {
                                 int tempAverageZ = tempObj.AverageZ;
 
-                                if (tempAverageZ >= currentZ && objZ - tempAverageZ >= Constants.DEFAULT_BLOCK_HEIGHT && (tempAverageZ <= maxZ && (tempObj.Flags & (uint) PATH_OBJECT_FLAGS.POF_SURFACE) != 0 || (tempObj.Flags & (uint) PATH_OBJECT_FLAGS.POF_BRIDGE) != 0 && tempObj.Z <= maxZ))
+                                if (tempAverageZ >= currentZ && objZ - tempAverageZ >= Constants.DEFAULT_BLOCK_HEIGHT && (tempAverageZ <= maxZ && (tempObj.Flags & (uint)PATH_OBJECT_FLAGS.POF_SURFACE) != 0 || (tempObj.Flags & (uint)PATH_OBJECT_FLAGS.POF_BRIDGE) != 0 && tempObj.Z <= maxZ))
                                 {
                                     int delta = Math.Abs(z - tempAverageZ);
 
@@ -533,7 +530,7 @@ namespace ClassicUO.Game
                 }
             }
 
-            z = (sbyte) resultZ;
+            z = (sbyte)resultZ;
 
             return resultZ != -128;
         }
@@ -617,11 +614,11 @@ namespace ClassicUO.Game
             int newX = x;
             int newY = y;
             sbyte newZ = z;
-            byte newDirection = (byte) direction;
-            GetNewXY((byte) direction, ref newX, ref newY);
-            bool passed = CalculateNewZ(newX, newY, ref newZ, (byte) direction);
+            byte newDirection = (byte)direction;
+            GetNewXY((byte)direction, ref newX, ref newY);
+            bool passed = CalculateNewZ(newX, newY, ref newZ, (byte)direction);
 
-            if ((sbyte) direction % 2 != 0)
+            if ((sbyte)direction % 2 != 0)
             {
                 if (passed)
                 {
@@ -630,7 +627,7 @@ namespace ClassicUO.Game
                         int testX = x;
                         int testY = y;
                         sbyte testZ = z;
-                        byte testDir = (byte) (((byte) direction + _dirOffset[i]) % 8);
+                        byte testDir = (byte)(((byte)direction + _dirOffset[i]) % 8);
                         GetNewXY(testDir, ref testX, ref testY);
                         passed = CalculateNewZ(testX, testY, ref testZ, testDir);
                     }
@@ -643,7 +640,7 @@ namespace ClassicUO.Game
                         newX = x;
                         newY = y;
                         newZ = z;
-                        newDirection = (byte) (((byte) direction + _dirOffset[i]) % 8);
+                        newDirection = (byte)(((byte)direction + _dirOffset[i]) % 8);
                         GetNewXY(newDirection, ref newX, ref newY);
                         passed = CalculateNewZ(newX, newY, ref newZ, newDirection);
                     }
@@ -655,64 +652,138 @@ namespace ClassicUO.Game
                 x = newX;
                 y = newY;
                 z = newZ;
-                direction = (Direction) newDirection;
+                direction = (Direction)newDirection;
             }
 
             return passed;
         }
 
-        private static int GetGoalDistCost(Point point, int cost)
+        private static double GetGoalDistCost(Point point)
+        //=> Math.Max(Math.Abs(_endPoint.X - point.X), Math.Abs(_endPoint.Y - point.Y));
         {
-            return Math.Max(Math.Abs(_endPoint.X - point.X), Math.Abs(_endPoint.Y - point.Y));
+            var dx = _endPoint.X - point.X;
+            var dy = _endPoint.Y - point.Y;
+            var dp = dx * dx + dy * dy;
+
+            return Math.Sqrt(dp);
         }
 
-        private static PathNode OpenNode(int direction, Position openPosition, PathNode parent, int cost)
+        private static PathNode OpenNode(int direction, Position openPosition, PathNode parent, double cost)
         {
-            PathNode node = GetPathNode(openPosition);
+            PathNode node = GetNode(openPosition);
 
+            Point position = new Point(openPosition.X, openPosition.Y);
             if (node == null)
             {
-                Point position = new Point(openPosition.X, openPosition.Y);
-                var goalCost = GetGoalDistCost(position, cost);
-                var startCost = parent.DistFromStartCost + cost;
+                var goalCost = GetGoalDistCost(position);
+                var startCost = parent.StartCost + DirectionChangeCost(cost, parent.Direction, direction);
                 node = AddNode(new PathNode(openPosition)
                 {
                     Parent = parent,
                     Direction = direction,
-                    DistFromGoalCost = goalCost,
-                    DistFromStartCost = startCost,
-                    Cost = goalCost + startCost,
-                });
+                    GoalCost = goalCost,
+                    StartCost = startCost,
+                    Cost = goalCost + startCost ,
+                }).Value;
 
-                if (MathHelper.GetDistance(_endPoint, position) <= _pathfindDistance)
+                if (MathHelper.GetDistance(_endPoint, position) <= _pathfindDistance && (_goalNode == null || _goalNode.Cost > node.Cost))
                     _goalNode = node;
+
             }
-            else if (!node.Visited)
+            else
             {
-                int startCost = parent.DistFromStartCost + cost;
-
-                if (node.DistFromStartCost > startCost)
-                {
-                    node.Parent = parent;
-                    node.Direction = direction;
-                    node.DistFromStartCost = startCost + cost;
-                    node.Cost = node.DistFromGoalCost + node.DistFromStartCost;
-                }
+                UpdateNode(node, parent, direction, cost);
             }
-
 
             return node;
         }
 
-        private static PathNode AddNode(PathNode pathNode)
+        private static void UpdateNode(PathNode node, PathNode parent, int direction, double cost)
         {
-            _nodeMap.Add(pathNode.Position, pathNode);
+            //if (node.Visited)
+            //    NodeError(node, " is visited and cannot be changed");
+            var startCost = parent.StartCost + DirectionChangeCost(cost, parent.Direction, direction);
+            if (node.StartCost > startCost)
+            {
+                //Console.Write($"{Log(node.Direction)}/{Log(parent.Direction)}>{Log(direction)} ");
+                //TODO: Fix linear search
+                if (!node.Visited)
+                    _openNodes.Remove(node);
 
-            return pathNode;
+                node.Parent = parent;
+                node.Direction = direction;
+                node.StartCost = startCost;
+                node.Cost = node.GoalCost + node.StartCost;
+            }
+        }
+        
+        private static LinkedListNode<PathNode> AddNode(PathNode node)
+        {
+            var mapPoint = GetMapPoint(node.Position);
+
+            if (mapPoint != _invalidPoint)
+            {
+                var oldNode = _nodeMap[mapPoint.X, mapPoint.Y];
+
+                if (oldNode != null)
+                    NodeError(oldNode, "is already added");
+
+                _nodeMap[mapPoint.X, mapPoint.Y] = node;
+                if (node.Visited)
+                    NodeError(node, " cannot be added as visited");
+                return AddToOpenNodes(node);
+            }
+
+            return null;
         }
 
-        private static PathNode GetPathNode(Position openPosition) 
-            => _nodeMap.TryGetValue(openPosition, out var node) ? node : null;
+        private static double DirectionChangeCost(double cost, int parentDirection, int direction)
+            => parentDirection == (int)Direction.NONE || parentDirection == direction ? cost : cost * 1.5;
+
+        private static char Log(int direction)
+        {
+            return ((Direction)direction).ToString()[0];
+        }
+
+        private static void NodeError(PathNode node, string error)
+        {
+            throw new Exception($"Path finding error: Node [{node.Position.X},{node.Position.Y}] {error}");
+        }
+
+        private static LinkedListNode<PathNode> AddToOpenNodes(PathNode node)
+        {
+            var nextNode = _openNodes.First;
+
+            while (nextNode != null && nextNode.Value.StartCost < node.StartCost)
+                nextNode = nextNode.Next;
+            _openedNodes++;
+
+            if (nextNode != null)
+                return _openNodes.AddBefore(nextNode, node);
+
+            return _openNodes.AddLast(node);
+        }
+
+
+        private static PathNode GetNode(Position openPosition)
+        {
+            var mapPoint = GetMapPoint(openPosition);
+            if (mapPoint != _invalidPoint)
+                return _nodeMap[mapPoint.X, mapPoint.Y];
+
+            return null;
+        }
+
+        private static readonly Point _invalidPoint = new Point(-1, -1);
+        private static Point GetMapPoint(Position openPosition)
+        {
+            var mapX = NODE_MAP_SIZE / 2 + openPosition.X - _startPoint.X;
+            var mapY = NODE_MAP_SIZE / 2 + openPosition.Y - _startPoint.Y;
+
+            if (mapX >= 0 && mapX < NODE_MAP_SIZE && mapY >= 0 && mapY < NODE_MAP_SIZE)
+                return new Point(mapX, mapY);
+            return _invalidPoint;
+        }
 
         private static void OpenNodes(PathNode node)
         {
@@ -750,55 +821,86 @@ namespace ClassicUO.Game
                         y,
                         z),
                         node,
-                        diagonal == 0 ? 1 : 2);
+                        //1);
+                    diagonal == 0 ? 1 : _sqrTwo);
                 }
             }
         }
 
+        private static readonly double _sqrTwo = Math.Sqrt(2);
         private static PathNode FindCheapestNode()
         {
-            PathNode cheapestNode = _nodeMap.Values.Where(x => !x.Visited).Min();
+            var cheapestNode = _openNodes.First;
+            //while (cheapestNode != null && cheapestNode.Value.Cost > cheapestNode.Next?.Value.Cost)
+            //    cheapestNode = cheapestNode.Next;
 
             if (cheapestNode != null)
-                cheapestNode.Visited = true;
+                VisitNode(cheapestNode);
 
-            return cheapestNode;
+            return cheapestNode?.Value;
+        }
+
+        private static int _openedNodes;
+        private static int _closedNodes;
+        private static void VisitNode(LinkedListNode<PathNode> node)
+        {
+            if (node.Value.Visited)
+                NodeError(node.Value, "is already visited");
+
+            node.Value.Visited = true;
+            _openNodes.Remove(node);
+            _openedNodes--;
+            _closedNodes++;
         }
 
         private static bool FindPath(int maxNodes)
         {
-            var goalCost = GetGoalDistCost(_startPoint, 0);
+            var goalCost = GetGoalDistCost(_startPoint);
             var currentNode = new PathNode(_startPoint.X, _startPoint.Y, World.Player.Z)
             {
-                Visited = true,
+                Direction = (int)Direction.NONE,
                 Parent = null,
-                DistFromGoalCost = goalCost,
+                GoalCost = goalCost,
                 Cost = goalCost,
             };
 
-            if (GetGoalDistCost(_startPoint, 0) > 14)
-            {
+            var linkedNode = AddNode(currentNode);
+            VisitNode(linkedNode);
+            if (GetGoalDistCost(_startPoint) > 2)
                 _run = true;
-            }
 
             while (AutoWalking)
             {
                 OpenNodes(currentNode);
 
-                if (_goalNode!=null)
+                currentNode = FindCheapestNode();
+
+                if (currentNode == null || _closedNodes >= maxNodes)
+                    break;
+            }
+
+            return ProcessGoalPath();
+        }
+
+        private static bool ProcessGoalPath()
+        {
+            if (_goalNode != null)
+            {
+                int totalNodes = 0;
+                PathNode goalNode = _goalNode;
+
+                while (goalNode.Parent != null && goalNode != goalNode.Parent)
                 {
-                    int totalNodes = 0;
-                    PathNode goalNode = _goalNode;
-
-                    while (goalNode.Parent != null && goalNode != goalNode.Parent)
-                    {
-                        goalNode = goalNode.Parent;
-                        totalNodes++;
-                    }
-
+                    goalNode = goalNode.Parent;
                     totalNodes++;
+                }
+
+                totalNodes++;
+                goalNode = _goalNode;
+                Console.Write($"[{_openedNodes}/{_closedNodes}]");
+                lock (_autoWalkLock)
+                {
                     _pathSize = totalNodes;
-                    goalNode = _goalNode;
 
                     while (totalNodes != 0)
                     {
@@ -807,18 +909,13 @@ namespace ClassicUO.Game
                         goalNode = goalNode.Parent;
                     }
 
-                    break;
+                    _pointIndex = 1;
                 }
 
-                currentNode = FindCheapestNode();
-
-                if (currentNode == null || _nodeMap.Count >= maxNodes)
-                {
-                    return false;
-                }
+                return true;
             }
 
-            return true;
+            return false;
         }
 
         public static bool WalkTo(int x, int y, int z, int distance)
@@ -828,8 +925,8 @@ namespace ClassicUO.Game
                 return false;
             }
 
-            _nodeMap = new Dictionary<Position, PathNode>(PATHFINDER_MAX_NODES);
-
+            Array.Clear(_nodeMap, 0, NODE_MAP_SIZE * NODE_MAP_SIZE);
+            _openNodes = new LinkedList<PathNode>();
 
             int playerX = World.Player.X;
             int playerY = World.Player.Y;
@@ -843,6 +940,8 @@ namespace ClassicUO.Game
             _endPoint.Y = y;
             _goalNode = null;
             _pathfindDistance = distance;
+            _openedNodes = 0;
+            _closedNodes = 0;
             _pathSize = 0;
             PathindingCanBeCancelled = true;
             StopAutoWalk();
@@ -850,7 +949,6 @@ namespace ClassicUO.Game
 
             if (FindPath(PATHFINDER_MAX_NODES))
             {
-                _pointIndex = 1;
                 ProcessAutoWalk();
             }
             else
@@ -858,34 +956,36 @@ namespace ClassicUO.Game
                 AutoWalking = false;
             }
 
-            _nodeMap = null;
+            _openNodes = null;
             return _pathSize != 0;
         }
 
+        private static readonly object _autoWalkLock = new object();
         public static void ProcessAutoWalk()
         {
             if (AutoWalking && World.InGame && World.Player.Walker.StepsCount < Constants.MAX_STEP_COUNT && World.Player.Walker.LastStepRequestTime <= Time.Ticks)
             {
-                if (_pointIndex >= 0 && _pointIndex < _pathSize)
-                {
-                    PathNode p = _path[_pointIndex];
-
-                    World.Player.GetEndPosition(out int x, out int y, out sbyte z, out Direction dir);
-
-                    if (dir == (Direction) p.Direction)
+                lock (_autoWalkLock)
+                    if (_pointIndex >= 0 && _pointIndex < _pathSize)
                     {
-                        _pointIndex++;
-                    }
+                        PathNode p = _path[_pointIndex];
 
-                    if (!World.Player.Walk((Direction) p.Direction, _run))
+                        World.Player.GetEndPosition(out int x, out int y, out sbyte z, out Direction dir);
+
+                        if (dir == (Direction)p.Direction)
+                        {
+                            _pointIndex++;
+                        }
+
+                        if (!World.Player.Walk((Direction)p.Direction, _run))
+                        {
+                            StopAutoWalk();
+                        }
+                    }
+                    else
                     {
                         StopAutoWalk();
                     }
-                }
-                else
-                {
-                    StopAutoWalk();
-                }
             }
         }
 
@@ -990,7 +1090,7 @@ namespace ClassicUO.Game
         }
         private class PathNode : IComparable<PathNode>
         {
-            public PathNode(int x, int y, int z) 
+            public PathNode(int x, int y, int z)
                 : this(new Position(x, y, z))
             {
             }
@@ -1011,16 +1111,16 @@ namespace ClassicUO.Game
 
             public bool Visited { get; set; }
 
-            public int Cost { get; set; }
+            public double Cost { get; set; }
 
-            public int DistFromStartCost { get; set; }
+            public double StartCost { get; set; }
 
-            public int DistFromGoalCost { get; set; }
+            public double GoalCost { get; set; }
 
             public PathNode Parent { get; set; }
 
 
-            public int CompareTo(PathNode other) 
+            public int CompareTo(PathNode other)
                 => Cost.CompareTo(other.Cost);
         }
     }
