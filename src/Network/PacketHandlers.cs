@@ -78,7 +78,7 @@ namespace ClassicUO.Network
         }
 
 
-        public void AnalyzePacket(byte[] data, int offset, int length)
+        public string AnalyzePacket(byte[] data, int offset, int length)
         {
             OnPacketBufferReader bufferReader = _handlers[data[0]];
 
@@ -88,7 +88,11 @@ namespace ClassicUO.Network
                 buffer.Seek(offset);
 
                 bufferReader(ref buffer);
+
+                return bufferReader.Method.Name;
             }
+
+            return null;
         }
 
         static PacketHandlers()
