@@ -47,17 +47,23 @@ namespace ClassicUO.Utility
             return input >= low && input <= high;
         }
 
-        public static int GetDistance(Point current, Point target)
+        public static double GetDistance(Point current, Point target)
         {
-            int distx = Math.Abs(target.X - current.X);
-            int disty = Math.Abs(target.Y - current.Y);
+            var dx = target.X - current.X;
+            var dy = target.Y - current.Y;
+            var dp = dx * dx + dy * dy;
 
-            if (disty > distx)
-            {
-                distx = disty;
-            }
+            return Math.Sqrt(dp);
 
-            return distx;
+            //int distx = Math.Abs(target.X - current.X);
+            //int disty = Math.Abs(target.Y - current.Y);
+
+            //if (disty > distx)
+            //{
+            //    distx = disty;
+            //}
+
+            //return distx;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

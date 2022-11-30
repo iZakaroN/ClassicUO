@@ -323,7 +323,7 @@ namespace ClassicUO.Network
                 var handlerName = PacketHandlers.Handlers.AnalyzePacket(data, offset, data.Length);
 
                 // ReSharper disable once LocalizableElement
-                //Console.WriteLine($"{handlerName} take {sw.Elapsed} after {DateTime.Now - _lastUpdate} idle. {_pluginRecvQueue.Count} queued.");
+                Console.WriteLine($"{handlerName} take {sw.Elapsed} after {DateTime.Now - _lastUpdate} idle. {_pluginRecvQueue.Count} queued.");
                 _lastUpdate = DateTime.Now;
             }
 

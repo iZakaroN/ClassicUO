@@ -1907,7 +1907,7 @@ namespace ClassicUO.Network
             ushort y = p.ReadUInt16BE();
             ushort z = p.ReadUInt16BE();
 
-            Pathfinder.WalkTo(x, y, z, 0);
+            Pathfinder.WalkTo(x, y, z, 1);
         }
 
         private static void UpdateContainedItems(ref StackDataReader p)

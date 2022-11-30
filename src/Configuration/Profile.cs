@@ -277,7 +277,7 @@ namespace ClassicUO.Configuration
 
         public bool UseSmoothBoatMovement { get; set; } = false;
 
-        public bool IgnoreStaminaCheck { get; set; } = false;
+        public bool IgnoreStaminaCheck { get; set; } = true;
 
         public bool ShowJournalClient { get; set; } = true;
         public bool ShowJournalObjects { get; set; } = true;

@@ -658,15 +658,8 @@ namespace ClassicUO.Game
             return passed;
         }
 
-        private static double GetGoalDistCost(Point point)
+        private static double GetGoalDistCost(Point point) => MathHelper.GetDistance(point, _endPoint);
         //=> Math.Max(Math.Abs(_endPoint.X - point.X), Math.Abs(_endPoint.Y - point.Y));
-        {
-            var dx = _endPoint.X - point.X;
-            var dy = _endPoint.Y - point.Y;
-            var dp = dx * dx + dy * dy;
-
-            return Math.Sqrt(dp);
-        }
 
         private static PathNode OpenNode(int direction, Position openPosition, PathNode parent, double cost)
         {
@@ -683,10 +676,12 @@ namespace ClassicUO.Game
                     Direction = direction,
                     GoalCost = goalCost,
                     StartCost = startCost,
-                    Cost = goalCost + startCost ,
+                    Cost = goalCost + startCost,
                 }).Value;
 
-                if (MathHelper.GetDistance(_endPoint, position) <= _pathfindDistance && (_goalNode == null || _goalNode.Cost > node.Cost))
+                var endPointDistance = MathHelper.GetDistance(_endPoint, position);
+                var currentGoalDistance = _goalNode == null ? int.MaxValue : MathHelper.GetDistance(_endPoint, new Point(_goalNode.X, _goalNode.Y));
+                if (endPointDistance <= _pathfindDistance && (_goalNode == null || _goalNode.Cost > node.Cost || currentGoalDistance > endPointDistance))
                     _goalNode = node;
 
             }
@@ -716,7 +711,7 @@ namespace ClassicUO.Game
                 node.Cost = node.GoalCost + node.StartCost;
             }
         }
-        
+
         private static LinkedListNode<PathNode> AddNode(PathNode node)
         {
             var mapPoint = GetMapPoint(node.Position);
