@@ -765,7 +765,7 @@ namespace ClassicUO.Game
             Items.Clear();
             Mobiles.Clear();
             Player?.Destroy();
-            //Player = null;
+            Player = null;
             Map?.Destroy();
             Map = null;
             Light.Overall = Light.RealOverall = 0;
@@ -798,7 +798,7 @@ namespace ClassicUO.Game
                 Map.Destroy();
                 Map = null;
                 Player.Destroy();
-                //Player = null;
+                Player = null;
             }
 
             foreach (Item item in Items.Values)
