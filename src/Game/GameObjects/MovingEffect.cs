@@ -31,18 +31,13 @@
 #endregion
 
 using System;
-using ClassicUO.Configuration;
 using ClassicUO.Game.Managers;
-using ClassicUO.Utility;
 using Microsoft.Xna.Framework;
-using MathHelper = Microsoft.Xna.Framework.MathHelper;
 
 namespace ClassicUO.Game.GameObjects
 {
     internal sealed class MovingEffect : GameEffect
-    {
-        private uint _lastMoveTime;
-        
+    {        
         public MovingEffect
         (
             EffectManager manager,
@@ -59,13 +54,14 @@ namespace ClassicUO.Game.GameObjects
             bool fixedDir,
             int duration,
             byte speed
-        ) : base(manager, graphic, hue, duration, speed)
+        ) : base(manager, graphic, hue, 0, speed)
         {
             FixedDir = fixedDir;
 
             // we override interval time with speed
-            IntervalInMs = speed;
-            //_lastMoveTime = Time.Ticks + IntervalInMs;
+            var d = Constants.ITEM_EFFECT_ANIMATION_DELAY * 2;
+
+            IntervalInMs = (uint)(d + (speed * d));
 
             // moving effects want a +22 to the X
             Offset.X += 22;
@@ -100,13 +96,7 @@ namespace ClassicUO.Game.GameObjects
         public override void Update()
         {
             base.Update();
-
-            if (_lastMoveTime < Time.Ticks)
-            {
-                UpdateOffset();
-
-                _lastMoveTime = Time.Ticks + IntervalInMs;
-            }
+            UpdateOffset();
         }
 
 
@@ -114,9 +104,9 @@ namespace ClassicUO.Game.GameObjects
         {
             if (Target != null && Target.IsDestroyed)
             {
-                Destroy();
-
-                return;
+                TargetX = Target.X;
+                TargetY = Target.Y;
+                TargetZ = Target.Z;
             }
 
             int playerX = World.Player.X;
@@ -140,10 +130,21 @@ namespace ClassicUO.Game.GameObjects
 
             Vector2 target = new Vector2((offsetTargetX - offsetTargetY) * 22, (offsetTargetX + offsetTargetY) * 22 - offsetTargetZ * 4);
 
-            Vector2.Subtract(ref target, ref source, out Vector2 offset);
-            Vector2.Distance(ref source, ref target, out float distance);
-            //distance -= 22;
-            Vector2.Multiply(ref offset, (IntervalInMs / distance) * Time.Delta * 1000, out Vector2 s0);
+            var offset = target - source;
+            var distance = offset.Length();
+            var frameIndependentSpeed = IntervalInMs * Time.Delta;
+            Vector2 s0;
+
+            if (distance > frameIndependentSpeed)
+            {
+                offset.Normalize();
+                s0 = offset * frameIndependentSpeed;
+            }
+            else
+            {
+                s0 = target;
+            }
+
 
             if (distance <= 22)
             {
