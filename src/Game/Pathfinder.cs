@@ -44,8 +44,8 @@ namespace ClassicUO.Game
 {
     internal static class Pathfinder
     {
-        private const int PATHFINDER_MAX_NODES = 10000;
-        private const int NODE_MAP_SIZE = 500;
+        private const int PATHFINDER_MAX_NODES = 5000;
+        private const int NODE_MAP_SIZE = 200;
         private static PathNode _goalNode;
         private static int _pathfindDistance;
         private static LinkedList<PathNode> _openNodes;
@@ -185,8 +185,8 @@ namespace ClassicUO.Game
                                 }
 
                             case Item item when item.IsMulti || item.ItemData.IsInternal:
-                            {
-                                //canBeAdd = false;
+                                {
+                                    //canBeAdd = false;
 
                                     break;
                                 }
@@ -678,11 +678,11 @@ namespace ClassicUO.Game
                     GoalCost = goalCost,
                     StartCost = startCost,
                     Cost = goalCost + startCost,
-                }).Value;
+                })?.Value;
 
                 var endPointDistance = MathHelper.GetDistance(_endPoint, position);
                 var currentGoalDistance = _goalNode == null ? int.MaxValue : MathHelper.GetDistance(_endPoint, new Point(_goalNode.X, _goalNode.Y));
-                if (endPointDistance <= _pathfindDistance && (_goalNode == null || _goalNode.Cost > node.Cost || Math.Abs(_goalNode.Cost - node.Cost) < 0.5 && currentGoalDistance > endPointDistance))
+                if (node != null && endPointDistance <= _pathfindDistance && (_goalNode == null || _goalNode.Cost > node.Cost || Math.Abs(_goalNode.Cost - node.Cost) < 0.5 && currentGoalDistance > endPointDistance))
                     _goalNode = node;
 
             }
@@ -871,7 +871,7 @@ namespace ClassicUO.Game
 
                 currentNode = FindCheapestNode();
 
-                if (currentNode == null || _closedNodes >= maxNodes)
+                if (currentNode == null || _closedNodes >= maxNodes || _goalNode != null)
                     break;
             }
 
