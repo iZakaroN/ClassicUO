@@ -940,6 +940,8 @@ namespace ClassicUO.Game
             _pathSize = 0;
             PathindingCanBeCancelled = true;
             StopAutoWalk();
+            if(x<0 || y<0 || z<0)
+                return false;
             AutoWalking = true;
 
             if (FindPath(PATHFINDER_MAX_NODES))
